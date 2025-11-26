@@ -7,9 +7,9 @@ st.set_page_config(layout="wide")
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSN9y26MSLRftqr2_On7MEOJ4h4L1o1I_ZXsHfoF1F0qY7Mjnx0bX3A7sxJ7Hz_f02E-gkMxY1t9M_/pub?gid=393036172&single=true&output=csv"
 
-# ============================  
-# HÀM CONVERT ẢNH GOOGLE DRIVE  
-# ============================  
+# ============================
+# CONVERT LINK DRIVE
+# ============================
 def drive_to_image(url):
     if not isinstance(url, str):
         return ""
@@ -17,6 +17,9 @@ def drive_to_image(url):
         return "https://drive.google.com/uc?export=view&id=" + url.split("id=")[1]
     return url
 
+# ============================
+# LOAD CSV
+# ============================
 @st.cache_data
 def load_data():
     df = pd.read_csv(CSV_URL)
@@ -25,13 +28,12 @@ def load_data():
 
 df = load_data()
 
-# HIỂN THỊ CÁC CỘT THỰC TẾ
-st.write("Cột CSV thực tế:")
+st.write("### 🧾 Các cột thực tế trong CSV:")
 st.write(df.columns.tolist())
 
-# ============================  
-# RENAME CHUẨN THEO CSV  
-# ============================  
+# ============================
+# RENAME CHUẨN
+# ============================
 df.rename(columns={
     "latitud (lat.)": "lat",
     "longitud (long.)": "lon",
@@ -45,14 +47,18 @@ df.rename(columns={
     "código de la bodega (ab, nb, pdv)": "bodegacode",
 }, inplace=True)
 
-# CHUYỂN LAT–LON THÀNH SỐ
+# ============================
+# LAT / LON -> NUMERIC
+# ============================
 df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
 df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
 df = df.dropna(subset=["lat", "lon"])
 
-# ============================  
-# FILTER  
-# ============================  
+# ============================
+# FILTER UI
+# ============================
+st.write("### 🔍 Bộ lọc dữ liệu:")
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -61,7 +67,7 @@ with col1:
 
 with col2:
     tipo_list = ["(All)"] + sorted(df["tipouser"].dropna().unique().tolist())
-    sel_tipo = st.selectbox("Lọc theo user AC/AD", tipo_list)
+    sel_tipo = st.selectbox("Lọc theo AC/AD", tipo_list)
 
 df_map = df.copy()
 
@@ -71,10 +77,10 @@ if sel_suc != "(All)":
 if sel_tipo != "(All)":
     df_map = df_map[df_map["tipouser"] == sel_tipo]
 
-# ============================  
-# MAP  
-# ============================  
-st.write(f"📍 Số điểm hiển thị trên map: {len(df_map)}")
+# ============================
+# MAP
+# ============================
+st.write(f"### 🗺 Số điểm hiển thị trên bản đồ: {len(df_map)}")
 
 m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=6)
 
@@ -89,7 +95,6 @@ for _, row in df_map.iterrows():
     <b>Usuario:</b> {row['usercode']}<br>
     <b>Bodega:</b> {row['bodegacode']}<br>
     <b>Chips entregados:</b> {row['chips']}<br><br>
-
     <img src="{foto1}" width="220"><br>
     <img src="{foto2}" width="220"><br>
     <img src="{foto3}" width="220"><br>
@@ -103,8 +108,12 @@ for _, row in df_map.iterrows():
 
 st_folium(m, height=750, width=1500)
 
-# ============================  
-# HIỂN THỊ BẢNG  
-# ============================  
-st.write("### Dữ liệu chi tiết (filtered):")
-st.dataframe(df_map)
+# ============================
+# HIỂN THỊ BẢNG
+# ============================
+st.write("### 📄 Dữ liệu dạng bảng sau khi apply filter:")
+
+df_map_display = df_map.copy()
+df_map_display = df_map_display.astype(str)   # ← FIX lỗi ValueError
+
+st.dataframe(df_map_display, use_container_width=True)
