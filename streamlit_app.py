@@ -9,30 +9,40 @@ st.set_page_config(layout="wide")
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSN9y26MSLRftqr2_On7MEOJ4h4L1o1I_ZXsHfoF1F0qY7Mjnx0bX3A7sxJ7Hz_f02E-gkMxY1t9M_/pub?gid=393036172&single=true&output=csv"
 
 # ============================================================
-# HÀM FIX LINK DRIVE
-# convert thành link ảnh thực
+# FUNCTION CONVERT DRIVE URL
 # ============================================================
-def convert_drive_link(url):
+def convert_drive_thumb(url):
     if not isinstance(url, str):
         return ""
 
     # dạng: /file/d/<ID>/view
-    m = re.search(r'drive\.google\.com/file/d/([^/]+)/', url)
+    m = re.search(r'/file/d/([^/]+)/', url)
     if m:
         file_id = m.group(1)
-        return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
+        return file_id
 
     # dạng: open?id=<ID>
     if "open?id=" in url:
-        file_id = url.split("open?id=")[1]
-        return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
+        return url.split("open?id=")[1]
 
     # dạng: uc?export=view&id=<ID>
     if "uc?export=view&id=" in url:
-        file_id = url.split("uc?export=view&id=")[1]
-        return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
+        return url.split("uc?export=view&id=")[1]
 
-    return url
+    return ""
+
+
+def img_thumbnail_tag(file_id):
+    if not file_id:
+        return ""
+    return f"""
+        <a href="https://drive.google.com/uc?export=view&id={file_id}"
+           target="_blank">
+            <img src="https://drive.google.com/thumbnail?id={file_id}"
+                 width="260"
+                 style="border:1px solid #ccc; margin-bottom:6px;">
+        </a><br>
+    """
 
 
 # ============================================================
@@ -48,7 +58,7 @@ df = load_data()
 
 
 # ============================================================
-# RENAME CỘT
+# RENAME
 # ============================================================
 df.rename(columns={
     "latitud (lat.)": "lat",
@@ -63,10 +73,6 @@ df.rename(columns={
     "código de la bodega (ab, nb, pdv)": "bodegacode",
 }, inplace=True)
 
-
-# ============================================================
-# CONVERT LAT/LON
-# ============================================================
 df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
 df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
 df = df.dropna(subset=["lat", "lon"])
@@ -85,6 +91,7 @@ with col2:
     tipo_list = ["(All)"] + sorted(df["tipouser"].dropna().unique().tolist())
     sel_tipo = st.selectbox("Lọc theo AC/AD", tipo_list)
 
+
 df_map = df.copy()
 if sel_suc != "(All)":
     df_map = df_map[df_map["sucursal"] == sel_suc]
@@ -99,10 +106,11 @@ st.write(f"### 🗺 Số điểm hiển thị trên bản đồ: {len(df_map)}")
 
 m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=6)
 
+
 for _, row in df_map.iterrows():
-    img1 = convert_drive_link(row.get('fotoporta', ''))
-    img2 = convert_drive_link(row.get('fotoimplement', ''))
-    img3 = convert_drive_link(row.get('fotobipay', ''))
+    id1 = convert_drive_thumb(row.get('fotoporta', ''))
+    id2 = convert_drive_thumb(row.get('fotoimplement', ''))
+    id3 = convert_drive_thumb(row.get('fotobipay', ''))
 
     popup = f"""
     <b>Sucursal:</b> {row['sucursal']}<br>
@@ -112,12 +120,9 @@ for _, row in df_map.iterrows():
     <b>Chips:</b> {row['chips']}<br><br>
     """
 
-    if img1:
-        popup += f'<img src="{img1}" width="260"><br>'
-    if img2:
-        popup += f'<img src="{img2}" width="260"><br>'
-    if img3:
-        popup += f'<img src="{img3}" width="260"><br>'
+    popup += img_thumbnail_tag(id1)
+    popup += img_thumbnail_tag(id2)
+    popup += img_thumbnail_tag(id3)
 
     folium.Marker(
         location=[row["lat"], row["lon"]],
@@ -129,8 +134,7 @@ st_folium(m, height=750, width=1500)
 
 
 # ============================================================
-# SHOW TABLE — FIX VALUE ERROR
-# không dùng st.dataframe nữa
+# TABLE (HTML)
 # ============================================================
 df_display = df_map.applymap(lambda x: "" if pd.isna(x) else str(x))
 
@@ -141,11 +145,11 @@ table {
     border-collapse: collapse;
 }
 th, td {
-    border: 1px solid #aaa;
-    padding: 5px;
+    border: 1px solid #ccc;
+    padding: 4px;
     font-size: 14px;
 }
-tr:nth-child(even) {background-color: #f2f2f2;}
+tr:nth-child(even) {background-color: #f0f0f0;}
 </style>
 """, unsafe_allow_html=True)
 
