@@ -109,3 +109,42 @@ for _, row in df_map.iterrows():
     <b>Sucursal:</b> {row['sucursal']}<br>
     <b>Tipo:</b> {row['tipouser']}<br>
     <b>Usuario:</b> {row['usercode']}<br>
+    <b>Bodega:</b> {row['bodegacode']}<br>
+    <b>Chips:</b> {row['chips']}<br><br>
+
+    <div style="max-height:380px; overflow-y:auto; padding-right:4px;">
+        {img_block(fid1)}
+        {img_block(fid2)}
+        {img_block(fid3)}
+    </div>
+    """
+
+    folium.Marker(
+        location=[row["lat"], row["lon"]],
+        popup=folium.Popup(popup, max_width=280),
+        tooltip=row["sucursal"],
+    ).add_to(m)
+
+st_folium(m, height=750, width=1500)
+
+# ============================================================
+# BẢNG DƯỚI MAP (HTML, KHÔNG DÙNG ARROW)
+# ============================================================
+df_display = df_map.applymap(lambda x: "" if pd.isna(x) else str(x))
+
+st.markdown("""
+<style>
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    font-size: 13px;
+}
+tr:nth-child(even) {background-color: #f7f7f7;}
+</style>
+""", unsafe_allow_html=True)
+
+st.write(df_display.to_html(index=False, escape=False), unsafe_allow_html=True)
