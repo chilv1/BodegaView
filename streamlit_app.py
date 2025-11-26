@@ -9,24 +9,25 @@ st.set_page_config(layout="wide")
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSN9y26MSLRftqr2_On7MEOJ4h4L1o1I_ZXsHfoF1F0qY7Mjnx0bX3A7sxJ7Hz_f02E-gkMxY1t9M_/pub?gid=393036172&single=true&output=csv"
 
 # ============================================================
-# HÀM XỬ LÝ LINK DRIVE -> LINK ẢNH TRỰC TIẾP
+# HÀM FIX LINK DRIVE
+# convert thành link ảnh thực
 # ============================================================
 def convert_drive_link(url):
     if not isinstance(url, str):
         return ""
 
-    # Case 1: drive.google.com/file/d/<ID>/view
+    # dạng: /file/d/<ID>/view
     m = re.search(r'drive\.google\.com/file/d/([^/]+)/', url)
     if m:
         file_id = m.group(1)
         return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
 
-    # Case 2: drive.google.com/open?id=<ID>
-    if "drive.google.com/open?id=" in url:
+    # dạng: open?id=<ID>
+    if "open?id=" in url:
         file_id = url.split("open?id=")[1]
         return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
 
-    # Case 3: uc?export=view&id=<ID>
+    # dạng: uc?export=view&id=<ID>
     if "uc?export=view&id=" in url:
         file_id = url.split("uc?export=view&id=")[1]
         return f"https://drive.usercontent.google.com/download?id={file_id}&export=view"
@@ -45,7 +46,10 @@ def load_data():
 
 df = load_data()
 
-# rename các cột
+
+# ============================================================
+# RENAME CỘT
+# ============================================================
 df.rename(columns={
     "latitud (lat.)": "lat",
     "longitud (long.)": "lon",
@@ -61,11 +65,12 @@ df.rename(columns={
 
 
 # ============================================================
-# CONVERT THÀNH SỐ
+# CONVERT LAT/LON
 # ============================================================
 df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
 df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
 df = df.dropna(subset=["lat", "lon"])
+
 
 # ============================================================
 # FILTER UI
@@ -95,7 +100,6 @@ st.write(f"### 🗺 Số điểm hiển thị trên bản đồ: {len(df_map)}")
 m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=6)
 
 for _, row in df_map.iterrows():
-
     img1 = convert_drive_link(row.get('fotoporta', ''))
     img2 = convert_drive_link(row.get('fotoimplement', ''))
     img3 = convert_drive_link(row.get('fotobipay', ''))
@@ -125,7 +129,24 @@ st_folium(m, height=750, width=1500)
 
 
 # ============================================================
-# DATAFRAME
+# SHOW TABLE — FIX VALUE ERROR
+# không dùng st.dataframe nữa
 # ============================================================
-df_display = df_map.applymap(lambda x: str(x) if pd.notnull(x) else "")
-st.dataframe(df_display, use_container_width=True)
+df_display = df_map.applymap(lambda x: "" if pd.isna(x) else str(x))
+
+st.markdown("""
+<style>
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid #aaa;
+    padding: 5px;
+    font-size: 14px;
+}
+tr:nth-child(even) {background-color: #f2f2f2;}
+</style>
+""", unsafe_allow_html=True)
+
+st.write(df_display.to_html(index=False, escape=False), unsafe_allow_html=True)
