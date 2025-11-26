@@ -8,27 +8,23 @@ st.set_page_config(layout="wide")
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSN9y26MSLRftqr2_On7MEOJ4h4L1o1I_ZXsHfoF1F0qY7Mjnx0bX3A7sxJ7Hz_f02E-gkMxY1t9M_/pub?gid=393036172&single=true&output=csv"
 
-# ============================
-# CONVERT LINK DRIVE SANG ẢNH
-# ============================
-def drive_to_image(url):
-    if not isinstance(url, str):
-        return "https://via.placeholder.com/220?text=no+image"
-    
-    # Case 1: open?id=
-    if "open?id=" in url:
-        file_id = url.split("open?id=")[1]
-        return f"https://drive.google.com/uc?export=view&id={file_id}"
 
-    # Case 2: file/d/xxxxxx/
-    m = re.search(r'/file/d/(.*?)/', url)
+# ============================
+# HÀM CONVERT DRIVE IMAGE CHỈNH XÁC
+# ============================
+def drive_to_image_direct(url):
+    if not isinstance(url, str):
+        return "https://via.placeholder.com/240?text=no+image"
+
+    # nếu dạng:   https://drive.google.com/file/d/<ID>/view
+    m = re.search(r"drive.google.com/file/d/([^/]+)/view", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=view&id={file_id}"
 
-    # Case 3: uc?id=
-    if "uc?id=" in url:
-        file_id = url.split("uc?id=")[1]
+    # nếu dạng:   https://drive.google.com/open?id=<ID>
+    if "open?id=" in url:
+        file_id = url.split("open?id=")[1]
         return f"https://drive.google.com/uc?export=view&id={file_id}"
 
     return url
@@ -45,12 +41,7 @@ def load_data():
 
 df = load_data()
 
-st.write("### 🧾 Các cột thực tế trong CSV:")
-st.write(df.columns.tolist())
-
-# ============================
-# RENAME CHUẨN
-# ============================
+# rename
 df.rename(columns={
     "latitud (lat.)": "lat",
     "longitud (long.)": "lon",
@@ -65,18 +56,13 @@ df.rename(columns={
 }, inplace=True)
 
 
-# ============================
-# CLEAN & CONVERT
-# ============================
 df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
 df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
 df = df.dropna(subset=["lat", "lon"])
 
 # ============================
-# FILTER UI
+# FILTER
 # ============================
-st.write("### 🔍 Bộ lọc dữ liệu:")
-
 col1, col2 = st.columns(2)
 
 with col1:
@@ -97,27 +83,28 @@ if sel_tipo != "(All)":
 
 
 # ============================
-# DRAW MAP
+# MAP
 # ============================
 st.write(f"### 🗺 Số điểm hiển thị trên bản đồ: {len(df_map)}")
 
-m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=6)
+m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=7)
 
 for _, row in df_map.iterrows():
-    foto1 = drive_to_image(row.get("fotoporta", ""))
-    foto2 = drive_to_image(row.get("fotoimplement", ""))
-    foto3 = drive_to_image(row.get("fotobipay", ""))
+
+    img1 = drive_to_image_direct(row.get('fotoporta', ''))
+    img2 = drive_to_image_direct(row.get('fotoimplement', ''))
+    img3 = drive_to_image_direct(row.get('fotobipay', ''))
 
     popup = f"""
     <b>Sucursal:</b> {row['sucursal']}<br>
     <b>Tipo:</b> {row['tipouser']}<br>
     <b>Usuario:</b> {row['usercode']}<br>
     <b>Bodega:</b> {row['bodegacode']}<br>
-    <b>Chips entregados:</b> {row['chips']}<br><br>
+    <b>Chips:</b> {row['chips']}<br><br>
 
-    <img src="{foto1}" width="220" onerror="this.src='https://via.placeholder.com/220?text=no+image';"><br>
-    <img src="{foto2}" width="220" onerror="this.src='https://via.placeholder.com/220?text=no+image';"><br>
-    <img src="{foto3}" width="220" onerror="this.src='https://via.placeholder.com/220?text=no+image';"><br>
+    <img src="{img1}" width="260"><br>
+    <img src="{img2}" width="260"><br>
+    <img src="{img3}" width="260"><br>
     """
 
     folium.Marker(
@@ -130,10 +117,7 @@ st_folium(m, height=750, width=1500)
 
 
 # ============================
-# TABLE VIEW (NO ERROR)
+# TABLE
 # ============================
-st.write("### 📄 Dữ liệu dạng bảng sau khi lọc:")
-
-df_map_display = df_map.copy()
-df_map_display = df_map_display.astype(str)
-st.dataframe(df_map_display, use_container_width=True)
+df_display = df_map.astype(str)
+st.dataframe(df_display, use_container_width=True)
