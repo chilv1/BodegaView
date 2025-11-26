@@ -43,37 +43,31 @@ def img_block(fid: str) -> str:
         </div>
     """
 
+def safe(x):
+    return "" if pd.isna(x) else str(x)
+
 # ============================
 # TẢI CSV
 # ============================
 @st.cache_data
 def load_data():
     df = pd.read_csv(CSV_URL)
-    df.columns = df.columns.str.strip().str.lower()
+    df.columns = df.columns.str.strip()
     return df
 
 df = load_data()
 
-# Đổi tên cột
-df.rename(columns={
-    "latitud (lat.)": "lat",
-    "longitud (long.)": "lon",
-    "sucursal:": "sucursal",
-    "tipo de usuario:": "tipouser",
-    "cantidadd e chips entregados": "chips",
-    "cantidad de chips entregados": "chips",
-    "código de usuario ac/ad": "usercode",
-    "código de la bodega (ab, nb, pdv)": "bodegacode",
-    "evidencia porta chips": "fotoporta",
-    "evidencia de la implementar": "fotoimplement",
-    "evidencia de la foto de bipay": "fotobipay"
-}, inplace=True)
+# ============================
+# Đổi tên cột về dạng lower-case để xử lý
+# ============================
+df.columns = [c.lower() for c in df.columns]
 
-df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
-df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
-df["chips"] = pd.to_numeric(df["chips"], errors="coerce").fillna(0).astype(int)
+# ép dạng số cho lat/lon
+df["latitud (lat.)"] = pd.to_numeric(df["latitud (lat.)"], errors="coerce")
+df["longitud (long.)"] = pd.to_numeric(df["longitud (long.)"], errors="coerce")
+df["cantidad de chips entregados"] = pd.to_numeric(df["cantidad de chips entregados"], errors="coerce").fillna(0).astype(int)
 
-df = df.dropna(subset=["lat", "lon"])
+df = df.dropna(subset=["latitud (lat.)", "longitud (long.)"])
 
 # ============================
 # FILTER UI
@@ -81,47 +75,49 @@ df = df.dropna(subset=["lat", "lon"])
 col1, col2 = st.columns(2)
 
 with col1:
-    suc_list = ["(All)"] + sorted(df["sucursal"].dropna().unique().tolist())
+    suc_list = ["(All)"] + sorted(df["sucursal:"].dropna().unique().tolist())
     sel_suc = st.selectbox("Lọc theo Sucursal", suc_list)
 
 with col2:
-    tipo_list = ["(All)"] + sorted(df["tipouser"].dropna().unique().tolist())
+    tipo_list = ["(All)"] + sorted(df["tipo de usuario:"].dropna().unique().tolist())
     sel_tipo = st.selectbox("Lọc theo AC/AD", tipo_list)
 
 df_map = df.copy()
 if sel_suc != "(All)":
-    df_map = df_map[df_map["sucursal"] == sel_suc]
+    df_map = df_map[df_map["sucursal:"] == sel_suc]
 if sel_tipo != "(All)":
-    df_map = df_map[df_map["tipouser"] == sel_tipo]
+    df_map = df_map[df_map["tipo de usuario:"] == sel_tipo]
 
 # ============================
 # TẠO MAP
 # ============================
 st.write(f"### 🧭 Số điểm hiển thị trên bản đồ: {len(df_map)}")
 
-m = folium.Map(location=[df_map["lat"].mean(), df_map["lon"].mean()], zoom_start=6)
+m = folium.Map(location=[df_map["latitud (lat.)"].mean(), df_map["longitud (long.)"].mean()], zoom_start=6)
 marker_cluster = MarkerCluster().add_to(m)
 
-# tạo ID cho từng điểm
-df_map["row_id"] = df_map.index
-
 for _, row in df_map.iterrows():
-    fid1 = get_drive_id(row.get("fotoporta", ""))
-    fid2 = get_drive_id(row.get("fotoimplement", ""))
-    fid3 = get_drive_id(row.get("fotobipay", ""))
 
-    color = "green" if row["tipouser"] == "AC" else "red"
-    icon = "user" if row["tipouser"] == "AC" else "shopping-cart"
+    # === DRIVE IMAGES ===
+    fid1 = get_drive_id(row.get("evidencia porta chips", ""))
+    fid2 = get_drive_id(row.get("evidencia de la implementar", ""))
+    fid3 = get_drive_id(row.get("evidencia de la foto de bipay", ""))
+
+    # === FIELDS ĐÚNG TỪ CSV ===
+    usuario_val = safe(row.get("código de usuario ac/ad", ""))
+    bodega_val  = safe(row.get("código de la bodega (ab, nb, pdv)", ""))
+    chips_val   = safe(row.get("cantidad de chips entregados", ""))
+
+    # === ICON & COLOR ===
+    color = "green" if row["tipo de usuario:"] == "AC" else "red"
+    icon = "user" if row["tipo de usuario:"] == "AC" else "shopping-cart"
 
     popup = f"""
-    <b>Sucursal:</b> {row['sucursal']}<br>
-    <b>Tipo:</b> {row['tipouser']}<br>
-    <b>Usuario:</b> {row['usercode']}<br>
-    <b>Bodega:</b> {row['bodegacode']}<br>
-    <b>Chips:</b> {row['chips']}<br><br>
-
-    <b><u>(Click marker sẽ highlight dòng bên dưới)</u></b><br><br>
-
+    <b>Sucursal:</b> {row['sucursal:']}<br>
+    <b>Tipo:</b> {row['tipo de usuario:']}<br>
+    <b>Usuario:</b> {usuario_val}<br>
+    <b>Bodega:</b> {bodega_val}<br>
+    <b>Chips:</b> {chips_val}<br><br>
     <div style="max-height:380px; overflow-y:auto; padding-right:4px;">
         {img_block(fid1)}
         {img_block(fid2)}
@@ -130,26 +126,27 @@ for _, row in df_map.iterrows():
     """
 
     folium.Marker(
-        location=[row["lat"], row["lon"]],
+        location=[row["latitud (lat.)"], row["longitud (long.)"]],
         popup=folium.Popup(popup, max_width=280),
-        tooltip=f"{row['usercode']}",
+        tooltip=f"{usuario_val}",
         icon=folium.Icon(color=color, icon=icon, prefix="fa"),
     ).add_to(marker_cluster)
 
-clicked = st_folium(m, height=750, width=1500)
+st_folium(m, height=850, width=1500)
 
 # ============================
-# TẠO BẢNG DƯỚI MAP
+# BẢNG DƯỚI MAP
 # ============================
-df_display = df_map[["row_id","sucursal","tipouser","usercode","bodegacode","chips","lat","lon"]].copy()
-df_display = df_display.applymap(lambda x: "" if pd.isna(x) else str(x))
+df_display = df_map[[
+    "sucursal:", 
+    "tipo de usuario:",
+    "código de usuario ac/ad",
+    "código de la bodega (ab, nb, pdv)",
+    "cantidad de chips entregados",
+    "latitud (lat.)",
+    "longitud (long.)"
+]].copy()
 
-# CSS highlight hàng
-st.markdown("""
-<style>
-tr.highlight { background-color: yellow !important; }
-</style>
-""", unsafe_allow_html=True)
+df_display.columns = ["Sucursal","Tipo","Usuario","Bodega","Chips","Lat","Lon"]
 
-st.write(df_display.to_html(index=False, escape=False), unsafe_allow_html=True)
-
+st.dataframe(df_display, use_container_width=True)
