@@ -14,6 +14,10 @@ def load_data():
 
 df = load_data()
 
+for i, col in enumerate(df.columns):
+    st.write(f"{i} → '{col}' len={len(col)}")
+
+
 def get_drive_id(url: str) -> str:
     if not isinstance(url, str):
         return ""
