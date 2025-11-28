@@ -7,7 +7,7 @@ from folium.plugins import MarkerCluster
 
 st.set_page_config(layout="wide")
 
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSN9y26MSLRftqr2_On7MEOJ4h4L1o1I_ZXsHfoF1F0qY7Mjnx0bX3A7sxJ7Hz_f02E-gkMxY1t9M_/pub?gid=393036172&single=true&output=csv"
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSs5tRlFEqLz6J-Ubg8Kh3CkYokxMR-bl9VKWCNNSAV4H6KvNDRyGqDTssxh6dbxUpH0NXJyT8Tq430/pub?gid=393036172&single=true&output=csv"
 
 # ============================
 # LẤY DRIVE IMAGE ID
@@ -137,16 +137,27 @@ st_folium(m, height=850, width=1500)
 # ============================
 # BẢNG DƯỚI MAP
 # ============================
-df_display = df_map[[
-    "sucursal:", 
-    "tipo de usuario:",
-    "código de usuario ac/ad",
-    "código de la bodega (ab, nb, pdv)",
-    "cantidad de chips entregados",
-    "latitud (lat.)",
-    "longitud (long.)"
-]].copy()
+# Hiển thị các cột được yêu cầu: Sucursal, tipo de usuario, usuario: AC/AD, ba cột ảnh minh chứng và số lượng chips giao
+df_display = df_map[
+    [
+        "sucursal:",
+        "tipo de usuario:",
+        "usuario: ac/ad",
+        "evidencia porta chips",
+        "evidencia de la implementar",
+        "evidencia de la foto de bipay",
+        "cantidad de chips entregados",
+    ]
+].copy()
 
-df_display.columns = ["Sucursal","Tipo","Usuario","Bodega","Chips","Lat","Lon"]
+df_display.columns = [
+    "Sucursal",
+    "Tipo de usuario",
+    "Usuario",
+    "Evidencia Porta Chips",
+    "Evidencia de la Implementar",
+    "Evidencia Foto BIPAY",
+    "Chips entregados",
+]
 
 st.dataframe(df_display, use_container_width=True)
