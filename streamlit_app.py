@@ -18,6 +18,8 @@ def load_data():
 df = load_data()
 st.write(df.head(5))
 
+df[['Longitud (LONG.)','Latitud (LAT.) ']].dropna().head(10)
+
 # DEBUG — IN CỘT THỰC TẾ
 # st.write(df.columns.tolist())
 
