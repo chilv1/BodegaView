@@ -8,56 +8,43 @@ st.set_page_config(layout="wide")
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSs5tRlFEqLz6J-Ubg8Kh3CkYokxMR-bl9VKWCNNSAV4H6KvNDRyGqDTssxh6dbxUpH0NXJyT8Tq430/pub?gid=393036172&single=true&output=csv"
 
+@st.cache_data
+def load_data():
+    return pd.read_csv(CSV_URL)
+
+df = load_data()
+
 def get_drive_id(url: str) -> str:
     if not isinstance(url, str):
         return ""
     url = url.strip()
-
     if "open?id=" in url:
         return url.split("open?id=")[1]
     m = re.search(r"/file/d/([^/]+)/", url)
-    if m:
-        return m.group(1)
-    if "uc?export=view&id=" in url:
-        return url.split("uc?export=view&id=")[1]
-    return ""
+    return m.group(1) if m else ""
 
-def img_block(fid: str) -> str:
+def img_block(fid: str):
     if not fid:
         return ""
-    thumb = f"https://drive.google.com/thumbnail?id={fid}"
-    full = f"https://drive.google.com/uc?export=view&id={fid}"
-    return f"""
-        <div style="margin-bottom:6px; text-align:center;">
-          <a href="{full}" target="_blank">
-            <img src="{thumb}"
-                 style="width:240px; max-height:180px; object-fit:cover; border:1px solid #ccc;">
-          </a>
-        </div>
-    """
+    return f'<img src="https://drive.google.com/thumbnail?id={fid}" width="200"><br>'
 
-@st.cache_data
-def load_data():
-    df = pd.read_csv(CSV_URL)
-    df.columns = df.columns.str.strip()
-    return df
-
-df = load_data()
-
+# ép dạng số
 df["Latitud (LAT.)"] = pd.to_numeric(df["Latitud (LAT.)"], errors="coerce")
 df["Longitud (LONG.)"] = pd.to_numeric(df["Longitud (LONG.)"], errors="coerce")
-
 df = df.dropna(subset=["Latitud (LAT.)", "Longitud (LONG.)"])
+
+def getval(row, col):
+    return row[col] if col in row else ""
 
 col1, col2 = st.columns(2)
 
 with col1:
-    sucursales = ["(All)"] + sorted(df["SUCURSAL:"].dropna().unique().tolist())
-    sel_suc = st.selectbox("Lọc theo Sucursal:", sucursales)
+    suc = ["(All)"] + sorted(df["SUCURSAL:"].dropna().unique().tolist())
+    sel_suc = st.selectbox("Sucursal:", suc)
 
 with col2:
-    tipos = ["(All)"] + sorted(df["Tipo de usuario:"].dropna().unique().tolist())
-    sel_tipo = st.selectbox("Lọc theo AC/AD:", tipos)
+    tipo = ["(All)"] + sorted(df["Tipo de usuario:"].dropna().unique().tolist())
+    sel_tipo = st.selectbox("Tipo de usuario:", tipo)
 
 df_map = df.copy()
 if sel_suc != "(All)":
@@ -65,7 +52,7 @@ if sel_suc != "(All)":
 if sel_tipo != "(All)":
     df_map = df_map[df_map["Tipo de usuario:"] == sel_tipo]
 
-st.write(f"### 🧭 Số điểm hiển thị: {len(df_map)}")
+st.write("### Số điểm:", len(df_map))
 
 m = folium.Map(
     location=[df_map["Latitud (LAT.)"].mean(), df_map["Longitud (LONG.)"].mean()],
@@ -73,20 +60,20 @@ m = folium.Map(
 )
 
 for _, row in df_map.iterrows():
-    fid1 = get_drive_id(row.get("EVIDENCIA PORTA CHIPS", ""))
-    fid2 = get_drive_id(row.get("EVIDENCIA DE LA IMPLEMENTAR", ""))
-    fid3 = get_drive_id(row.get("Evidencia de la foto de BIPAY", ""))
+
+    fid1 = get_drive_id(getval(row, "EVIDENCIA PORTA CHIPS"))
+    fid2 = get_drive_id(getval(row, "EVIDENCIA DE LA IMPLEMENTAR"))
+    fid3 = get_drive_id(getval(row, "Evidencia de la foto de BIPAY"))
 
     popup = f"""
-    <b>Sucursal:</b> {row['SUCURSAL:']}<br>
-    <b>Tipo usuario:</b> {row['Tipo de usuario:']}<br>
-    <b>Usuario:</b> {row['Usuario: AC/AD']}<br>
-    <b>Chips:</b> {row['Cantidad de chips entregados']}<br><br>
-    <div style="max-height:380px; overflow-y:auto;">
-        {img_block(fid1)}
-        {img_block(fid2)}
-        {img_block(fid3)}
-    </div>
+    <b>Sucursal:</b> {getval(row, 'SUCURSAL:')}<br>
+    <b>Tipo:</b> {getval(row, 'Tipo de usuario:')}<br>
+    <b>Usuario:</b> {getval(row, 'Usuario: AC/AD')}<br>
+    <b>Código:</b> {getval(row, 'Rellenar el Código')}<br>
+    <b>Chips:</b> {getval(row, 'Cantidad de chips entregados')}<br><br>
+    {img_block(fid1)}
+    {img_block(fid2)}
+    {img_block(fid3)}
     """
 
     folium.Marker(
@@ -96,28 +83,12 @@ for _, row in df_map.iterrows():
 
 st_folium(m, height=850, width=1500)
 
-# ============================
-# BẢNG DƯỚI MAP
-# ============================
-
-df_display = df_map[[
-    "SUCURSAL:",
-    "Tipo de usuario:",
-    "Usuario: AC/AD",
-    "Cantidad de chips entregados",
-    "EVIDENCIA PORTA CHIPS",
-    "EVIDENCIA DE LA IMPLEMENTAR",
-    "Evidencia de la foto de BIPAY"
-]].copy()
-
-df_display.columns = [
-    "Sucursal",
-    "Tipo de usuario",
-    "Usuario",
-    "Chips entregados",
-    "Porta Chips Img",
-    "Implementar Img",
-    "BIPAY Img"
-]
+df_display = pd.DataFrame({
+    "Sucursal": df_map["SUCURSAL:"],
+    "Tipo usuario": df_map["Tipo de usuario:"],
+    "Usuario": df_map["Usuario: AC/AD"],
+    "Código": df_map["Rellenar el Código"],
+    "Chips": df_map["Cantidad de chips entregados"],
+})
 
 st.dataframe(df_display, use_container_width=True)
