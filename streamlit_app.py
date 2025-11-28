@@ -16,6 +16,7 @@ def load_data():
     return pd.read_csv(CSV_URL)
 
 df = load_data()
+st.write(df.head(5))
 
 # DEBUG — IN CỘT THỰC TẾ
 # st.write(df.columns.tolist())
